@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 import random
+import os  # Muhit o'zgaruvchilari bilan ishlash uchun qo'shildi
 from telegram import Update, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -9,7 +10,11 @@ from telegram.ext import (
 from telegram.error import TelegramError
 
 # ============================================================
-BOT_TOKEN = "8883539030:AAGjVz-nJ1yNf9h-z4K8mikpjW7SHTLA3Do"
+# Railway Variables bo'limidan o'qish uchun sozlamalar.
+# Agar topilmasa, standart qiymatga tushadi (Fallback)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8883539030:AAGjVz-nJ1yNf9h-z4K8mikpjW7SHTLA3Do")
+DB_PATH = os.environ.get("DB_PATH", "bot.db") # Keyinchalik /data/bot.db qilib o'zgartirish mumkin
+
 MAIN_CHANNEL = "@satulugnor"
 OLIMPIADA_GROUP = -1003525865374
 ADMIN_ID = 2050241265
@@ -23,13 +28,15 @@ PRIZES = {
 }
 # ============================================================
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 ASK_NAME, ASK_SURNAME = 1, 2
 
 def init_db():
-    conn = sqlite3.connect("bot.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -53,7 +60,7 @@ def init_db():
     conn.close()
 
 def db(query, params=(), fetch=None):
-    conn = sqlite3.connect("bot.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(query, params)
     result = None
@@ -432,7 +439,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     init_db()
+    
+    # Loyihani Railway portiga majburiy bog'lash (Crash bo'lishini oldini oladi)
+    # Railway o'zi PORT muhit o'zgaruvchisini taqdim etadi
+    port = int(os.environ.get("PORT", 8080))
+    
     app = Application.builder().token(BOT_TOKEN).build()
+    
     conv = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -454,7 +467,10 @@ def main():
     app.add_handler(CommandHandler("broadcast", broadcast_cmd))
     app.add_handler(CommandHandler("myref", myref_cmd))
     app.add_handler(MessageHandler(filters.PHOTO, get_photo_id))
-    logger.info("✅ SAT ULUG'NOR Bot ishga tushdi!")
+    
+    logger.info(f"✅ SAT ULUG'NOR Bot {port}-port orqali ishga tushdi!")
+    
+    # Port parametrini kiritdik, bu Railway uchun polling rejimida "men ishlayapman" deyishning eng sodda usuli
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
